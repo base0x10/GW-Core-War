@@ -1,0 +1,213 @@
+;; this file contains values that seemed reasonable for athlon-xp
+;; note - most of 'combines' violate aliasing rules when used
+;; without 'union' or -fno-strict-aliasing option of gcc
+;; the options are ordered by how much they affect performance
+;; some options conflict with, or rely on others - keep an eye
+;; on error messages
+
+;; in this configuration the code contains mmx inlines
+;; (the exact behaviour of 'combine' options depends on
+;;  field types (set by 'type' options), but almost certainly
+;;  types other than already set won't work correctly in
+;;  this release)
+;; to disable them, hunt down the following options:
+;; mov i combine, mmx decm core pair,
+;; add f combine, add x combine, sub f combine, sub x combine
+;;
+;; add/sub x combine require also sse, so you should disable them
+;; if your processor doesn't support it
+
+;; allow to specify max_processes per warrior
+;; value = hardcoded maxproc for warr #1
+;; doesn't work with 'alter spl'
+;rfrenzy22 hack = 4
+
+;; to produce code that doesn't violate aliasing rules:
+;union = true
+;; these must point to appropriate
+;; fields (see 'fm_types.h' genereted 'union' for details)
+;offset a = 0
+;offset b = 1
+;offset f = 0
+;offset i = 1
+
+;; athlon seems to like these two, p3 just the opposite
+;; encourage conditional move instruction when folding core pointer
+fold ptr cmov = true
+;; set this if you want to use 'fold ptr cmov' and pointer is 64bit
+;pointer64bit = true
+
+;; register to keep ip in, leave it blank to let compiler decide
+ip register = edi
+
+;; allocate a large chunk of memory for process queue
+;; then we don't need to check for queue end after every push/pop
+;; how it affects performance depends on battle length - for 80000
+;; cycles it seems to help
+infinite queue = true
+
+;; store whole instruction in one variable (by default mmx register)
+mov i combine = true
+
+;; calculate first offset for b-value as soon as possible
+;; almost always a good thing
+cea precalc ptb = true
+
+;;;;;;; performance-critical options end here
+
+
+;; when set, both shorts will be read as one int, and compared to this value
+;; c11 is an int that contains (1<<16)+1, may be also a literal
+djn f combine = c11
+djn f cmov    = true
+djn f partial = true
+;; use mmx code in djn.f
+mmx decm core pair = true ;!!!
+;djn f negate  = true
+;djn f bitor   = true
+;djn f xor     = true
+;djn f complex = true
+
+
+jmn f combine = true
+jmn f cmov    = true
+jmn f partial = true
+;jmn f bitor   = true
+;jmn f complex = true
+;jmn f negate  = true
+
+
+jmz f combine = true
+jmz f cmov    = true
+jmz f partial = true
+;jmz f bitor   = true
+;jmz f complex = true
+;jmz f negate  = true
+
+
+seq i fold-once = true
+seq i cmov      = true
+seq i bitor     = true
+seq i xor       = true
+seq f combine   = true
+
+
+sne i fold-once = true
+sne i cmov      = true
+sne i bitor     = true
+sne i xor       = true
+sne f combine   = true
+
+
+;; use mmx in these instructions
+;; .x combine requires also sse (pshufw instruction)
+add f combine = true ;!!!
+;add x combine = true ;!!!
+sub f combine = true ;!!!
+;sub x combine = true ;!!!
+
+;;disassemble unsupported instruction to stdout
+verbose bind warrior = true
+
+
+debug level = 0
+
+; layout of instruction in the core
+; a, b - a- and b-field
+; in - opcode+modifier+addrmode_a+addrmode_b
+; optional int - padding of n bytes
+
+insn layout = a b in
+
+;; -- short, int, ptr, long, llong, coreptr, v4hi, v2si
+;; f - combined a and b field
+;; w - whole instruction
+;; (v4hi is 4*short mmx register, v2si is 2*int mmx register)
+
+type a = short
+type b = short
+type i = ptr
+type f = int
+type w = v4hi
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;
+;;  the options below weren't tested, as they are not likely to be
+;;  of much importance (regarding performance)
+
+;; this seems to trigger aliasing errors when using 'mov f/i combine'
+;postinc in register = true
+
+;predec in register = true
+
+;alter spl = true
+
+;; cause dats to jump to dat.f $ $ code
+;dat shortcut = true
+
+;; issue x86 rol instruction for swapping field in mov/seq/sne.x combine
+;asm rol = true
+
+;mov f combine = true
+;mov x combine = true
+
+;jmn negate    = true
+;jmn cmov      = true
+;jmn partial   = true
+
+
+;jmz negate    = true
+;jmz cmov      = true
+;jmz partial   = true
+
+;djn negate    = true
+;djn cmov      = true
+;djn partial   = true
+;djn xor       = true
+
+;seq i negate    = true
+
+;; mmx version isn't really faster
+;seq i combine   = true
+
+;seq f negate    = true
+;seq f fold-once = true
+;seq f cmov      = true
+
+;seq x negate    = true
+;seq x combine   = true
+;seq x fold-once = true
+;seq x cmov      = true
+
+;seq negate      = true
+;seq combine     = true
+;seq fold-once   = true
+
+
+;sne i negate    = true
+;sne i combine   = true
+
+;sne f negate    = true
+;sne f fold-once = true
+;sne f cmov      = true
+
+;sne x negate    = true
+;sne x combine   = true
+;sne x fold-once = true
+;sne x cmov      = true
+
+;sne negate      = true
+;sne combine     = true
+;sne fold-once   = true
+
+;slt f negate    = true
+;slt f combine   = true
+;slt f fold-once = true
+
+;slt x negate    = true
+;slt x combine   = true
+;slt x fold-once = true
+
+;slt negate      = true
+;slt combine     = true
+;slt fold-once   = true

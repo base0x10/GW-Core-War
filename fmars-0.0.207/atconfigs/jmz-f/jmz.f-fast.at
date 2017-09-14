@@ -1,0 +1,25 @@
+[benchmark]
+rc/0test/jmn-f.rc
+rc/0test/jmn-f-sk1.rc
+rc/0test/jmn-f-sk2.rc
+
+[options]
+-r 16000
+
+[configurations]
+jmn.f-binor.cfg
+jmn.f.cfg
+jmn.f-cmov.cfg
+jmn.f-cmov+combine.cfg
+jmn.f-combine.cfg
+jmn.f-combine+negate.cfg
+jmn.f-complex.cfg
+jmn.f-negate.cfg
+jmn.f-neg+compl+binor.cfg
+jmn.f-neg+compl.cfg
+jmn.f-neg+part+compl+binor.cfg
+jmn.f-partial.cfg
+jmn.f-partial+combine.cfg
+jmn.f-partial+combine+negate.cfg
+jmn.f-partial+complex+binor.cfg
+jmn.f-partial+complex.cfg

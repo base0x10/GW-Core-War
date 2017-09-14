@@ -1,0 +1,6 @@
+;assert 1
+       ORG      START
+START  DJN.F  $     1, <     1     
+       DJN.B  $    -1, #    -2     
+       JMP.B  #     0, $     0     
+

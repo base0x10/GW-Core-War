@@ -1,0 +1,277 @@
+1) Introduction
+2) Compilation
+3) Using fmars
+4) Redcode assembler
+5) Python (SWIG) interface
+6) Known issues and contact information
+
+==========
+
+
+1) Introduction
+
+fmars is Fast Memory Array Redcode Simulator - a specialized simulator
+for the game of Corewars. It's designed to be of particular use in automated
+redcode optimizers and evolvers. fmars borrows the idea from Martin Ankerl's
+qmars and pushes it to the extreme - it generates source code with special
+case for every possible opcode/addressing mode combination. This allows
+some optimizations that aren't possible in other simulators. fmars is
+compatible with pMARS with an exception for p-space, which is not yet
+implemented.
+
+==========
+
+
+2) Compilation
+
+To build fmars, you will need GCC (preferrably >= 3.2) and Guile 1.6
+(Scheme interpreter). It should be possible to compile fmars with a different
+compiler, but probably (at least for Intel's compiler) the performance will
+be much worse, and some of optimizations rely on GCC extensions.
+
+
+The code generator takes a list of instructions as an input, and produces
+a simulator which will be able to run warriors consisting of these
+instructions. Trying to run a warrior that contains an instruction that
+wasn't included in generator's input will cause the simulator to report an
+error.
+
+The generator can read the list of instructions either from a warrior
+assembled by pMARS, or from a file containing lines in the form:
+
+opcode.modifer a_addressing_mode b_addressing_mode
+
+The make variable INSN_FILES controls which files will be parsed, and is
+set to 'fsh.set' by default. So, to build a mars that will supports every
+warrior from Fixed Strategy Hill, and additionally a warrior 'war.red',
+issue the following command:
+
+make INSN_FILES="fsh.set war.red"
+
+where 'war.red' is a warrior preprocessed by pMARS or fmars parser. This
+should result the generation of the object file 'fm_sim.o' and the header
+file 'fm_types.h'. Then it should be possible to link the mars with your
+program. Note that header files 'insn.h' and 'exhaust.h' slightly differ
+from the ones from original exhaust.
+
+
+The quality of generated code is controlled by configuration file
+'fmars.cfg'. It includes a number of optimization options, some of which
+are processor-specific. The configuration file contains more details.
+
+
+IMPORTANT
+
+When generated with certain configuration options, the code violates
+C aliasing rules. That may sometimes result in a bad output from the
+simulator. The only reason for keeping such code is that it happens to
+work faster (with GCC 3.3). It depends on the compiler if it will work
+correctly and how much faster.
+
+If you decide to use such code, you should test it for correctness. You
+may find autotest.py useful for detecting wrong behavior of mars. If it
+happens, you have several options:
+
+- use -fno-strict-aliasing option of GCC
+- enable 'union' switch in configuration file
+- disable the offending configuration option
+
+Every solution leads to a certain slowdown. And it is hard to tell which one
+is best - you should check this for yourself.
+
+==========
+
+
+3) Using fmars
+
+In order to use fmars in your programs, you should perform following steps:
+
+- allocate memory for mars
+- load warriors into exhaust format (possibly using fmars parser)
+- convert warriors from exhaust format into fmars internal format
+- for each round:
+   - clear the core
+   - load warriors (in internal format) into the core
+   - call the simulator
+- free allocated memory (both simulator and warriors)
+
+
+Example usage
+
+To allocate memory for the simulator:
+
+   #include "fmars.h"
+
+   int nwarriors = 2;
+   int coresize = 8000;
+   int processes = 8000;
+   int cycles = 80000;
+   int pspacesize = 500;
+   int maxlength = 100;
+   int rounds = 200;
+
+   fmars_mars_t *mars;
+
+   mars = fmars_alloc (nwarriors, coresize, processes, cycles, pspacesize);
+   if (mars == NULL)
+      panic ("Failed to allocate memory");
+
+
+In order to interact with the world, fmars uses (slightly modified) exhaust
+warrior format. To get a warrior in this format using fmars parser, you
+should do somethin like this (for simplicity, the example code doesn't
+check for errors and buffer overflows other than related to fmars):
+
+   #include "fm_asm.h"
+
+   int err;
+   char buf[16384];
+   warrior_t *exhaust_w1, *exhaust_w2;
+
+   /* read the file into a string */
+
+   size = read (open ("aeka.rc", O_RDONLY), buf, sizeof (buf));
+   buf[size] = 0;
+
+   /* call the parser; it will return 0 on success or error in case of an
+      error; arguments set to -1 in this example are used only for predefines
+      in the assembler */
+   
+   err = fm_asm_string (buf, NULL, &exhaust_w1,
+                        nwarriors, coresize, -1, -1, -1, maxlength, -1, -1);
+   if (err)
+       panic ("Assembler error");
+
+   [repeat for the second warrior]
+
+
+The Exhaust format is convenient for transportation purposes, but for sake of
+performance, fmars uses different format internally. The internal
+representation of the warrior is tightly bound to the allocated mars, which
+means you cannot reuse the same warrior in different instances of mars.
+
+    fmars_warrior_t *w1, *w2;
+    
+    w1 = fmars_bind_warrior (mars, exhaust_w1);
+    free (exhaust_w1->code);
+    free (exhaust_w1);
+
+    w2 = fmars_bind_warrior (mars, exhaust_w2);
+    free (exhaust_w2->code);
+    free (exhaust_w2);
+    
+    if (w1 == NULL || w2 == NULL)
+        panic ("Failed to convert warriors");
+
+
+Now, we need to clear the core and load the warriors into it. The third
+argument of fmars_load_warrior() is warrior's unique ID ranging from
+0 to (nwarr - 1), which shouldn't be changed if the pspace is being used.
+The fourth argument is position in the core to load the warrior, and
+the fifth argument is warrior's position in the starting seqence,
+also ranging from 0 to (nwarr - 1).
+
+   int wins[]   = {0, 0};
+   int losses[] = {0, 0};
+   int ties[]   = {0, 0};
+
+   for (round = 0; round < rounds; round++)
+   {
+      fmars_clear_core (mars);
+      fmars_load_warrior (mars, w1, 0, 0, round % 2);
+      fmars_load_warrior (mars, w2, 1, 100 + random () % 7801, 1 - round % 2);
+
+
+Now we're ready to call the simulator. The return value will contain number
+of warriors that survived (or -1 in case of simulator panic), and death_tab
+will contain IDs of dead warriors, in order in which they were killed:
+
+      [still in for loop]
+
+      int alive, *death_tab;
+
+      alive = fmars_sim_multiwarrior (mars, &death_tab);
+      if (alive < 0)
+         panic ("Simulator panic (unsupported instruction?)");
+      else if (alive == 2)
+      {
+         ties[0]++;
+         ties[1]++;
+      }
+      else if (death_tab[0] == 0)
+      {
+         /* warrior with ID 0 lost */
+         losses[0]++;
+         wins[1]++;
+      }
+      else
+      {
+         wins[0]++;
+         losses[1]++;
+      }
+   } /* for */
+  
+
+When we're done, we can free previously allocated memory:
+
+   fmars_free_warrior (w1);
+   fmars_free_warrior (w2);
+   fmars_free (mars);
+
+
+For more details check header files 'fmars.h' and 'fm_asm.h'.
+
+==========
+
+
+4) Redcode assembler
+
+fmars includes an easy to embed redcode parser. It is compatible with pMARS
+assembler, with following exceptions:
+
+- there are no arithmetic registers
+- the comments, including preprocessor directives, are not parsed
+- FOR/ROF loops are not allowed in EQUs
+- EQUs other than arithmetic expressions must be declared before they
+  are used
+- EQUs are not expanded when instruction modifier is expected (after dot)
+
+
+The assembler is designed to deal with correct input. It is a bit more
+allowing than pMARS (for example, you can redefine labels and EQUs),
+and gives almost no feedback on errors.
+
+
+5) Python interface
+
+fmars also includes rudimentary bindings for languages supported by
+SWIG. The makefile only supports python binding, but adding other
+languages should be trivial (see SWIG manual). You should be able
+to figure out how to use these bindings by looking at sample application,
+pymars.py (it's really simple).
+
+
+==========
+
+
+6) Known problems, bugs and future work
+
+- the Makefile is currently broken (just 'make clean' in case of problems).
+- MMX code works only for short ints as core field type
+- MMX didn't work under windows the last time I checkd
+- the simulator may not work when coresize is greater than maximal
+  value of a field type
+
+
+For future releases, I'm planning to implement p-space, clean up code a bit,
+include more friendly API for simulator and assembler, and maybe a client and
+a server for distributed computation.
+
+
+If you stumble on any unexpected behavior which wasn't mentioned in this
+file, please send me an e-mail to the address below. I'd appreciate a simple
+test case if possible.
+
+
+The author can be reached at this address:
+janeczek@gmail.com

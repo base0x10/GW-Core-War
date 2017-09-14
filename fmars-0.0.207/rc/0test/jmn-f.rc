@@ -1,0 +1,12 @@
+;assert 1
+       ORG      START
+START  JMN.F  #     0, {     0     
+       JMN.F  #     0, {     0     
+       JMN.F  #     0, {     0     
+       JMN.F  #     0, {     0     
+       JMN.F  $    -1, {    -1     
+       JMN.F  $    -2, {    -2     
+       JMN.F  $    -3, {    -3     
+       JMN.F  $    -4, {    -4     
+       JMP.B  $    -5, $    -5     
+
