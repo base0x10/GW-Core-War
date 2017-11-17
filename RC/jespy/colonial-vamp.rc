@@ -1,0 +1,23 @@
+;redcode-94
+;name colonial-vamp
+;author jespy
+;strategy vampire which rather than trapping processes, recruits them to dat bomb
+;strategy October '17
+
+;assert (CORESIZE==8000) && (MAXPROCESSES==8000)
+;assert (MAXCYCLES==80000) && (MAXLENGTH==100)
+;assert (MINDISTANCE==100)
+
+; TODO: Rather than bombing indefinitely, trapped process should bomb once-over and the kill itself
+; TODO: Improve efficiency adding more mov instructions 
+
+        ORG       VAMP
+BOMBER  add.ab    #4, BOMB      ; add the A field of the src to the b field of dest (BOMB)
+        mov.i     BOMB, @BOMB   ; move the entire cell at bomb into the address in the b field of bomb
+        jmp       BOMBER        ; loop back
+BOMB:   dat       #0, #0
+VAMP:   add.ab    #CORESIZE/256, FANG      ; Vampire is a bomber that drops jmp traps
+        mov.i     FANG, @FANG 
+        jmp       VAMP
+FANG:   jmp       BOMBER
+        END

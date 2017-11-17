@@ -1,6 +1,0 @@
-	PIN	123
-
-       ORG      START
-START  LDP.AB #     1, #     0     
-       JMZ.B  $    -1, $    -1     
-
